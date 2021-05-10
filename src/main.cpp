@@ -193,8 +193,8 @@ void handle_input () {
 }
 
 void tick_snek () {
-  head.x += direction.x;
-  head.y += direction.y;
+  head.x += COLUMN_COUNT + direction.x;
+  head.y += DISPLAY_PIXEL_HEIGHT + direction.y;
   head.x %= COLUMN_COUNT;
   head.y %= DISPLAY_PIXEL_HEIGHT;
   if (
