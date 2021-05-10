@@ -49,6 +49,25 @@ void render_font_char_to_buffer (char *string, int x_offset, uint8_t *buffer)
   }
 }
 
+void set_pixel(uint8_t x, uint8_t y, bool state)
+{
+  uint8_t columnIndex = (
+    COLUMN_COUNT // column order is actually right to left? WTF?
+    - (x % COLUMN_COUNT)
+  );
+  uint8_t columnValue = scr[columnIndex];
+  uint8_t shiftAmount = (
+    (DISPLAY_PIXEL_HEIGHT - 1) - // row order is bottom to top
+    (y % DISPLAY_PIXEL_HEIGHT)
+  );
+  uint8_t shiftedMask = ~ (1 << shiftAmount);
+  columnValue = (
+    (columnValue & shiftedMask) |
+    (state << shiftAmount)
+  );
+  scr[columnIndex] = columnValue;
+}
+
 void setup() {
   //init displays:
   initMAX7219();
@@ -56,7 +75,6 @@ void setup() {
   sendCmdAll(CMD_INTENSITY, DEFAULT_BRIGHTNESS); //set brightness
 
   //print an init message to the display:
-  refreshAllRot90();
   render_font_char_to_buffer("GOATS!!", 0x00, scr);
   refreshAllRot90();
   Serial.begin(9600);
@@ -66,26 +84,18 @@ void setup() {
 }
 
 void loop() {
-  uint8_t columnIndex = (
-    (currentPixel
-    // So the display library assumes that the display will be 16 wide x 16 tall?
-    // And scr is a sparse array? So * DISPLAY_COUNT jumps into the next display?
-    * DISPLAY_COUNT)
-    / COLUMN_COUNT
+  set_pixel(
+    currentPixel % COLUMN_COUNT, // x
+    currentPixel / COLUMN_COUNT, // y
+    false
   );
-  uint8_t rowIndex = currentPixel % DISPLAY_PIXEL_HEIGHT;
-  uint8_t columnValue = scr[columnIndex];
-  columnValue = 1 << rowIndex;
-  scr[columnIndex] = columnValue;
-  Serial.printf(
-    "currentPixel: %03d, columnIndex: %03d, rowIndex: %03d, columnValue: %03d\n",
-    currentPixel,
-    columnIndex,
-    rowIndex,
-    columnValue
-  );
-  refreshAllRot90();
   currentPixel += 1;
   currentPixel %= TOTAL_PIXELS;
-  delay(4);
+  set_pixel(
+    currentPixel % COLUMN_COUNT, // x
+    currentPixel / COLUMN_COUNT, // y
+    true
+  );
+  refreshAllRot90();
+  delay(10);
 }
