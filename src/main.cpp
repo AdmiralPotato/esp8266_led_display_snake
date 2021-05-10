@@ -6,14 +6,23 @@
 //default brightness - can be from 0x0 to 0xF
 //#define DEFAULT_BRIGHTNESS 0x6U
 #define DEFAULT_BRIGHTNESS 0xFU
+#define DIRECTION_COUNT 4
 
 typedef struct {
-  uint8_t x;
-  uint8_t y;
+  int8_t x;
+  int8_t y;
 } Vec;
 
 Vec direction = { 1, 1 };
 Vec head = {};
+Vec directions[DIRECTION_COUNT] = {
+  {  0,  1 }, // east
+  {  1,  0 }, // south
+  {  0, -1 }, // west
+  { -1,  0 }, // north
+};
+
+uint8_t tick = 0;
 
 // ref: https://stackoverflow.com/a/2603254/1053092
 static unsigned char lookup[16] = {
@@ -125,6 +134,11 @@ void loop() {
     head.y,
     true
   );
+  tick++;
+  tick %= 16;
+  if ((tick % DIRECTION_COUNT) == 0) {
+    direction = directions[tick / DIRECTION_COUNT];
+  }
   refreshAllRot90();
   delay(100);
 }
