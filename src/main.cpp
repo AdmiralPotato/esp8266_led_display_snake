@@ -7,7 +7,7 @@
 //#define DEFAULT_BRIGHTNESS 0x6U
 #define DEFAULT_BRIGHTNESS 0xFU
 #define DIRECTION_COUNT 4
-#define SNAKE_MAX_TAIL_LENGTH 256
+#define SNAKE_MAX_TAIL_LENGTH 255
 
 typedef struct {
   int8_t x;
@@ -22,8 +22,9 @@ Vec directions[DIRECTION_COUNT] = {
   {  0, -1 }, // north
 };
 Vec direction = directions[0];
-uint8_t currentTailLength = 8;
-Vec tailPositions[SNAKE_MAX_TAIL_LENGTH] = {0};
+char previousInput = 'd';
+uint8_t currentTailLength = 6;
+Vec tailPositions[SNAKE_MAX_TAIL_LENGTH];
 
 // ref: https://stackoverflow.com/a/2603254/1053092
 static unsigned char lookup[16] = {
@@ -107,11 +108,38 @@ void display_bounds() {
   );
 }
 
-void push_current_tail_segment (Vec head) {
+void reset_game (char *message) {
+  for(uint8_t i = 0; i < SNAKE_MAX_TAIL_LENGTH; i++) {
+    tailPositions[i] = {
+      .x = 0,
+      .y = 0
+    };
+  }
+  head = {
+    .x = COLUMN_COUNT / 2,
+    .y = DISPLAY_PIXEL_HEIGHT / 2
+  };
+  direction = directions[0];
+  clr();
+  render_font_char_to_buffer(message, 0x00, scr);
+  refreshAllRot90();
+  delay(1000);
+}
+
+bool push_current_tail_segment_and_check_collision (Vec head) {
   for(uint8_t i = SNAKE_MAX_TAIL_LENGTH - 1; i > 0; i--) {
-    tailPositions[i] = tailPositions[i - 1];
+    Vec segment = tailPositions[i - 1];
+    if (
+      i <= currentTailLength &&
+      (segment.x == head.x) &&
+      (segment.y == head.y)
+    ) {
+      return true;
+    }
+    tailPositions[i] = segment;
   }
   tailPositions[0] = head;
+  return false;
 }
 
 void draw_tail () {
@@ -125,16 +153,49 @@ void draw_tail () {
   }
 }
 
+void handle_input () {
+  if (Serial.available() > 0) {
+    char input = Serial.read();
+    bool handleInput = false;
+    Serial.printf(
+      "input: %c\n",
+      input
+    );
+    switch (input) {
+      case 'd': handleInput = previousInput != 'a'; break;
+      case 's': handleInput = previousInput != 'w'; break;
+      case 'a': handleInput = previousInput != 'd'; break;
+      case 'w': handleInput = previousInput != 's'; break;
+      default : handleInput = false; break;
+    }
+    if (handleInput) {
+      switch (input) {
+        case 'd': direction = directions[0]; break;
+        case 's': direction = directions[1]; break;
+        case 'a': direction = directions[2]; break;
+        case 'w': direction = directions[3]; break;
+        default : direction = directions[0]; break;
+      }
+      previousInput = input;
+    }
+  }
+}
+
+void move_snek () {
+  head.x += direction.x;
+  head.y += direction.y;
+  head.x %= COLUMN_COUNT;
+  head.y %= DISPLAY_PIXEL_HEIGHT;
+}
+
 void setup() {
   //init displays:
   initMAX7219();
   sendCmdAll(CMD_SHUTDOWN, 1); //turn shutdown mode off
   sendCmdAll(CMD_INTENSITY, DEFAULT_BRIGHTNESS); //set brightness
 
-  //print an init message to the display:
-  render_font_char_to_buffer("SNEK!!", 0x00, scr);
-  refreshAllRot90();
-  delay(1000);
+  reset_game("SNEK!!");
+
   Serial.begin(9600);
   // space past the garbage that for some reason always comes out on startup
   Serial.println("                ");
@@ -142,29 +203,16 @@ void setup() {
 }
 
 void loop() {
-  char input = 0;
-  if (Serial.available() > 0) {
-    input = Serial.read();
-    Serial.printf(
-      "input: %c\n",
-      input
-    );
-    switch(input) {
-      case 'd': direction = directions[0]; break;
-      case 's': direction = directions[1]; break;
-      case 'a': direction = directions[2]; break;
-      case 'w': direction = directions[3]; break;
-      default : direction = directions[0]; break;
-    }
-  }
+  handle_input();
+  move_snek();
   clr();
   display_bounds();
-  head.x += direction.x;
-  head.y += direction.y;
-  head.x %= COLUMN_COUNT;
-  head.y %= DISPLAY_PIXEL_HEIGHT;
-  push_current_tail_segment(head);
-  draw_tail();
-  refreshAllRot90();
-  delay(100);
+  bool collided = push_current_tail_segment_and_check_collision(head);
+  if (!collided) {
+    draw_tail();
+    refreshAllRot90();
+    delay(100);
+  } else {
+    reset_game("DEAD :(");
+  }
 }
