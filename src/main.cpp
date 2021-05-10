@@ -13,16 +13,15 @@ typedef struct {
   int8_t y;
 } Vec;
 
-Vec direction = { 1, 1 };
 Vec head = {};
 Vec directions[DIRECTION_COUNT] = {
-  {  0,  1 }, // east
-  {  1,  0 }, // south
-  {  0, -1 }, // west
-  { -1,  0 }, // north
+  {  1,  0 }, // east
+  {  0,  1 }, // south
+  { -1,  0 }, // west
+  {  0, -1 }, // north
 };
-
-uint8_t tick = 0;
+Vec direction = directions[0];
+uint8_t lastInput = 'd';
 
 // ref: https://stackoverflow.com/a/2603254/1053092
 static unsigned char lookup[16] = {
@@ -119,10 +118,25 @@ void setup() {
   Serial.begin(9600);
   // space past the garbage that for some reason always comes out on startup
   Serial.println("                ");
-  Serial.println();
+  Serial.println("Keyboard input here pls");
 }
 
 void loop() {
+  char input = 0;
+  if (Serial.available() > 0) {
+    input = Serial.read();
+    Serial.printf(
+      "input: %c\n",
+      input
+    );
+    switch(input) {
+      case 'd': direction = directions[0]; break;
+      case 's': direction = directions[1]; break;
+      case 'a': direction = directions[2]; break;
+      case 'w': direction = directions[3]; break;
+      default : direction = directions[0]; break;
+    }
+  }
   clr();
   display_bounds();
   head.x += direction.x;
@@ -134,11 +148,6 @@ void loop() {
     head.y,
     true
   );
-  tick++;
-  tick %= 16;
-  if ((tick % DIRECTION_COUNT) == 0) {
-    direction = directions[tick / DIRECTION_COUNT];
-  }
   refreshAllRot90();
   delay(100);
 }
