@@ -7,7 +7,13 @@
 //#define DEFAULT_BRIGHTNESS 0x6U
 #define DEFAULT_BRIGHTNESS 0xFU
 
-uint8_t currentPixel = 0;
+typedef struct {
+  uint8_t x;
+  uint8_t y;
+} Vec;
+
+Vec direction = { 1, 1 };
+Vec head = {};
 
 // ref: https://stackoverflow.com/a/2603254/1053092
 static unsigned char lookup[16] = {
@@ -52,7 +58,7 @@ void render_font_char_to_buffer (char *string, int x_offset, uint8_t *buffer)
 void set_pixel(uint8_t x, uint8_t y, bool state)
 {
   uint8_t columnIndex = (
-    COLUMN_COUNT // column order is actually right to left? WTF?
+    (COLUMN_COUNT - 1) // column order is actually right to left? WTF?
     - (x % COLUMN_COUNT)
   );
   uint8_t columnValue = scr[columnIndex];
@@ -68,6 +74,29 @@ void set_pixel(uint8_t x, uint8_t y, bool state)
   scr[columnIndex] = columnValue;
 }
 
+void display_bounds() {
+  set_pixel(
+    0,
+    0,
+    true
+  );
+  set_pixel(
+    0,
+    DISPLAY_PIXEL_HEIGHT - 1,
+    true
+  );
+  set_pixel(
+    COLUMN_COUNT -1,
+    0,
+    true
+  );
+  set_pixel(
+    COLUMN_COUNT -1,
+    DISPLAY_PIXEL_HEIGHT - 1,
+    true
+  );
+}
+
 void setup() {
   //init displays:
   initMAX7219();
@@ -75,8 +104,9 @@ void setup() {
   sendCmdAll(CMD_INTENSITY, DEFAULT_BRIGHTNESS); //set brightness
 
   //print an init message to the display:
-  render_font_char_to_buffer("GOATS!!", 0x00, scr);
+  render_font_char_to_buffer("SNEK!!", 0x00, scr);
   refreshAllRot90();
+  delay(1000);
   Serial.begin(9600);
   // space past the garbage that for some reason always comes out on startup
   Serial.println("                ");
@@ -84,18 +114,17 @@ void setup() {
 }
 
 void loop() {
+  clr();
+  display_bounds();
+  head.x += direction.x;
+  head.y += direction.y;
+  head.x %= COLUMN_COUNT;
+  head.y %= DISPLAY_PIXEL_HEIGHT;
   set_pixel(
-    currentPixel % COLUMN_COUNT, // x
-    currentPixel / COLUMN_COUNT, // y
-    false
-  );
-  currentPixel += 1;
-  currentPixel %= TOTAL_PIXELS;
-  set_pixel(
-    currentPixel % COLUMN_COUNT, // x
-    currentPixel / COLUMN_COUNT, // y
+    head.x,
+    head.y,
     true
   );
   refreshAllRot90();
-  delay(10);
+  delay(100);
 }
