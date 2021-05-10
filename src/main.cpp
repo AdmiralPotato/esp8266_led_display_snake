@@ -7,8 +7,7 @@
 //#define DEFAULT_BRIGHTNESS 0x6U
 #define DEFAULT_BRIGHTNESS 0xFU
 
-uint8_t goatCount = 0;
-char message[16];
+uint8_t currentPixel = 0;
 
 // ref: https://stackoverflow.com/a/2603254/1053092
 static unsigned char lookup[16] = {
@@ -57,9 +56,9 @@ void setup() {
   sendCmdAll(CMD_INTENSITY, DEFAULT_BRIGHTNESS); //set brightness
 
   //print an init message to the display:
-  render_font_char_to_buffer("HELLO", 0x00, scr);
   refreshAllRot90();
-
+  render_font_char_to_buffer("GOATS!!", 0x00, scr);
+  refreshAllRot90();
   Serial.begin(9600);
   // space past the garbage that for some reason always comes out on startup
   Serial.println("                ");
@@ -67,15 +66,26 @@ void setup() {
 }
 
 void loop() {
-  sprintf(
-    message,
-    "GOAT %d",
-    goatCount
+  uint8_t columnIndex = (
+    (currentPixel
+    // So the display library assumes that the display will be 16 wide x 16 tall?
+    // And scr is a sparse array? So * DISPLAY_COUNT jumps into the next display?
+    * DISPLAY_COUNT)
+    / COLUMN_COUNT
   );
-  Serial.println(message);
-  goatCount++;
-  clr();
-  render_font_char_to_buffer(message, 0x00, scr);
+  uint8_t rowIndex = currentPixel % DISPLAY_PIXEL_HEIGHT;
+  uint8_t columnValue = scr[columnIndex];
+  columnValue = 1 << rowIndex;
+  scr[columnIndex] = columnValue;
+  Serial.printf(
+    "currentPixel: %03d, columnIndex: %03d, rowIndex: %03d, columnValue: %03d\n",
+    currentPixel,
+    columnIndex,
+    rowIndex,
+    columnValue
+  );
   refreshAllRot90();
-  delay(200);
+  currentPixel += 1;
+  currentPixel %= TOTAL_PIXELS;
+  delay(4);
 }
