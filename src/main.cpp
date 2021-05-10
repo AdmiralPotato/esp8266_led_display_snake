@@ -7,6 +7,7 @@
 //#define DEFAULT_BRIGHTNESS 0x6U
 #define DEFAULT_BRIGHTNESS 0xFU
 #define DIRECTION_COUNT 4
+#define SNAKE_MAX_TAIL_LENGTH 256
 
 typedef struct {
   int8_t x;
@@ -21,7 +22,8 @@ Vec directions[DIRECTION_COUNT] = {
   {  0, -1 }, // north
 };
 Vec direction = directions[0];
-uint8_t lastInput = 'd';
+uint8_t currentTailLength = 8;
+Vec tailPositions[SNAKE_MAX_TAIL_LENGTH] = {0};
 
 // ref: https://stackoverflow.com/a/2603254/1053092
 static unsigned char lookup[16] = {
@@ -105,6 +107,24 @@ void display_bounds() {
   );
 }
 
+void push_current_tail_segment (Vec head) {
+  for(uint8_t i = SNAKE_MAX_TAIL_LENGTH - 1; i > 0; i--) {
+    tailPositions[i] = tailPositions[i - 1];
+  }
+  tailPositions[0] = head;
+}
+
+void draw_tail () {
+  for(uint8_t i = 0; i < currentTailLength; i++) {
+    Vec segment = tailPositions[i];
+    set_pixel(
+      segment.x,
+      segment.y,
+      true
+    );
+  }
+}
+
 void setup() {
   //init displays:
   initMAX7219();
@@ -143,11 +163,8 @@ void loop() {
   head.y += direction.y;
   head.x %= COLUMN_COUNT;
   head.y %= DISPLAY_PIXEL_HEIGHT;
-  set_pixel(
-    head.x,
-    head.y,
-    true
-  );
+  push_current_tail_segment(head);
+  draw_tail();
   refreshAllRot90();
   delay(100);
 }
