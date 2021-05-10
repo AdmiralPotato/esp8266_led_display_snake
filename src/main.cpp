@@ -7,6 +7,7 @@
 //#define DEFAULT_BRIGHTNESS 0x6U
 #define DEFAULT_BRIGHTNESS 0xFU
 #define DIRECTION_COUNT 4
+#define SNAKE_MIN_TAIL_LENGTH 6
 #define SNAKE_MAX_TAIL_LENGTH 255
 
 typedef struct {
@@ -22,8 +23,9 @@ Vec directions[DIRECTION_COUNT] = {
   {  0, -1 }, // north
 };
 Vec direction = directions[0];
+Vec apple = { 0, 0 };
 char previousInput = 'd';
-uint8_t currentTailLength = 6;
+uint8_t currentTailLength = SNAKE_MIN_TAIL_LENGTH;
 Vec tailPositions[SNAKE_MAX_TAIL_LENGTH];
 
 // ref: https://stackoverflow.com/a/2603254/1053092
@@ -108,6 +110,13 @@ void display_bounds() {
   );
 }
 
+void spawn_apple () {
+  apple = {
+    .x = (int8_t) random(1, COLUMN_COUNT - 2),
+    .y = (int8_t) random(1, DISPLAY_PIXEL_HEIGHT - 2)
+  };
+}
+
 void reset_game (char *message) {
   for(uint8_t i = 0; i < SNAKE_MAX_TAIL_LENGTH; i++) {
     tailPositions[i] = {
@@ -115,11 +124,13 @@ void reset_game (char *message) {
       .y = 0
     };
   }
+  currentTailLength = SNAKE_MIN_TAIL_LENGTH;
   head = {
     .x = COLUMN_COUNT / 2,
     .y = DISPLAY_PIXEL_HEIGHT / 2
   };
   direction = directions[0];
+  spawn_apple();
   clr();
   render_font_char_to_buffer(message, 0x00, scr);
   refreshAllRot90();
@@ -181,11 +192,19 @@ void handle_input () {
   }
 }
 
-void move_snek () {
+void tick_snek () {
   head.x += direction.x;
   head.y += direction.y;
   head.x %= COLUMN_COUNT;
   head.y %= DISPLAY_PIXEL_HEIGHT;
+  if (
+      (apple.x == head.x) &&
+      (apple.y == head.y)
+  ) {
+    currentTailLength += 1;
+    currentTailLength %= SNAKE_MAX_TAIL_LENGTH;
+    spawn_apple();
+  }
 }
 
 void setup() {
@@ -193,6 +212,8 @@ void setup() {
   initMAX7219();
   sendCmdAll(CMD_SHUTDOWN, 1); //turn shutdown mode off
   sendCmdAll(CMD_INTENSITY, DEFAULT_BRIGHTNESS); //set brightness
+
+  randomSeed(analogRead(D0));
 
   reset_game("SNEK!!");
 
@@ -204,12 +225,17 @@ void setup() {
 
 void loop() {
   handle_input();
-  move_snek();
-  clr();
-  display_bounds();
-  bool collided = push_current_tail_segment_and_check_collision(head);
-  if (!collided) {
+  tick_snek();
+  bool dead = push_current_tail_segment_and_check_collision(head);
+  if (!dead) {
+    clr();
+    display_bounds();
     draw_tail();
+    set_pixel(
+      apple.x,
+      apple.y,
+      true
+    );
     refreshAllRot90();
     delay(100);
   } else {
